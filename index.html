@@ -3,268 +3,196 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>JETEM express — Заказ доставки</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="" crossorigin=""/>
+  <title>JETEM express — Панель приёма заказов</title>
   <style>
-    :root{--blue:#0b69d6;--white:#ffffff}
-    body{margin:0;font-family:Inter, Arial, sans-serif;background:var(--blue);color:var(--white);min-height:100vh;display:flex;flex-direction:column}
-    header{padding:18px 16px;text-align:center}
-    h1{margin:0;font-size:20px}
-    .container{display:flex;gap:16px;padding:12px;flex:1}
-    /* Left: customer form */
-    .panel{background:rgba(255,255,255,0.06);border-radius:12px;padding:12px;flex:1;min-width:300px}
-    label{display:block;font-size:13px;margin-top:8px}
-    input[type=text], input[type=tel], input[type=number], textarea{width:100%;padding:8px;border-radius:6px;border:0;background:rgba(255,255,255,0.08);color:var(--white)}
-    .row{display:flex;gap:8px}
-    .btn{display:inline-block;padding:10px 14px;border-radius:8px;border:0;background:var(--white);color:var(--blue);font-weight:600;cursor:pointer;margin-top:10px}
-    #map{height:420px;border-radius:8px;margin-top:10px}
-    .small{font-size:13px;color:rgba(255,255,255,0.85)}
-    .admin{background:rgba(0,0,0,0.15);padding:10px;border-radius:10px;margin-top:12px}
-    .tabs{display:flex;gap:6px}
-    .tab{padding:8px 10px;border-radius:8px;background:rgba(255,255,255,0.06);cursor:pointer}
-    .order{background:rgba(255,255,255,0.04);padding:8px;border-radius:8px;margin-top:8px}
-    .actions{display:flex;gap:8px;margin-top:8px}
-    footer{padding:10px;text-align:center;font-size:13px;color:rgba(255,255,255,0.9)}
-    @media(max-width:900px){.container{flex-direction:column}.panel{min-width:unset}}
+    :root{--blue:#0b69d6;--white:#ffffff;--muted: #e6eefc}
+    body{margin:0;font-family:Inter, Arial, sans-serif;background:#f6f8fb;color:#0b1733}
+    header{background:var(--blue);color:var(--white);padding:14px 16px;display:flex;align-items:center;justify-content:space-between}
+    header h1{margin:0;font-size:18px}
+    header .support{font-size:14px;opacity:0.95}
+    .wrap{display:flex;gap:16px;padding:16px}
+    .sidebar{width:260px;background:white;border-radius:10px;padding:12px;box-shadow:0 4px 18px rgba(11,105,214,0.08)}
+    .main{flex:1;background:white;border-radius:10px;padding:12px;box-shadow:0 4px 18px rgba(11,105,214,0.06)}
+    .tabs{display:flex;gap:8px}
+    .tab{padding:8px 10px;border-radius:8px;background:var(--muted);cursor:pointer}
+    .search{margin-top:12px}
+    input[type=text]{width:100%;padding:8px;border-radius:8px;border:1px solid #e3e9f5}
+    .order{border:1px solid #eef4ff;padding:10px;border-radius:8px;margin-bottom:10px;display:flex;justify-content:space-between;gap:8px}
+    .order .left{flex:1}
+    .order .right{display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+    .btn{padding:8px 10px;border-radius:8px;border:0;background:var(--blue);color:var(--white);cursor:pointer}
+    .btn.secondary{background:#f3f6fb;color:#0b69d6;border:1px solid #dbe9ff}
+    .status{padding:6px 8px;border-radius:6px;font-size:13px}
+    .s-new{background:#fff6e6;color:#9a6a00}
+    .s-accepted{background:#eef9f2;color:#167a3b}
+    .s-inprogress{background:#eef4ff;color:#0b69d6}
+    .s-completed{background:#f0fff4;color:#0e9d3f}
+    .s-cancelled{background:#fff0f3;color:#a10b3a}
+    .details{margin-top:8px;border-top:1px dashed #eef4ff;padding-top:8px}
+    .photo{max-width:120px;border-radius:6px}
+    /* login overlay */
+    #loginOverlay{position:fixed;inset:0;background:rgba(11,105,214,0.08);display:flex;align-items:center;justify-content:center}
+    #loginCard{background:white;padding:20px;border-radius:12px;width:360px;box-shadow:0 8px 30px rgba(11,105,214,0.12)}
+    #loginCard h2{margin:0 0 6px 0}
+    #loginCard input{width:100%;padding:8px;border-radius:8px;border:1px solid #e6eefc;margin-top:8px}
+    .small{font-size:13px;color:#6b7280}
+    @media(max-width:900px){.wrap{flex-direction:column}.sidebar{width:100%}}
   </style>
 </head>
 <body>
   <header>
-    <h1>JETEM express</h1>
-    <div class="small">Работаем с 10:00 до 22:00 — зона: город Конаев (
-        )</div>
+    <h1>JETEM express — Панель приёма заказов</h1>
+    <div class="support">Служба поддержки: <strong>+7 747 352 2909</strong></div>
   </header>
 
-  <div class="container">
-    <div class="panel" id="customerPanel">
-      <h2 style="margin-top:0;color:var(--white)">Оформление заказа</h2>
-
-      <label>Точка A (адрес)</label>
-      <input id="fromAddress" type="text" placeholder="Улица, ориентир" />
-
-      <div class="row">
-        <div style="flex:2">
-          <label>Номер дома</label>
-          <input id="fromHouse" type="text" />
-        </div>
-        <div style="flex:2">
-          <label>Номер квартиры</label>
-          <input id="fromApt" type="text" />
-        </div>
-        <div style="flex:1">
-          <label>Этаж</label>
-          <input id="fromFloor" type="number" min="0" />
-        </div>
+  <div class="wrap">
+    <div class="sidebar">
+      <div class="tabs">
+        <div class="tab" data-filter="all">Все</div>
+        <div class="tab" data-filter="new">Новые</div>
+        <div class="tab" data-filter="accepted">Принятые</div>
+        <div class="tab" data-filter="inprogress">В процессе</div>
+        <div class="tab" data-filter="completed">Завершённые</div>
+        <div class="tab" data-filter="cancelled">Отменённые</div>
       </div>
-
-      <label>Точка B (адрес)</label>
-      <input id="toAddress" type="text" placeholder="Улица, ориентир" />
-
-      <div class="row">
-        <div style="flex:2">
-          <label>Номер дома</label>
-          <input id="toHouse" type="text" />
-        </div>
-        <div style="flex:2">
-          <label>Номер квартиры</label>
-          <input id="toApt" type="text" />
-        </div>
-        <div style="flex:1">
-          <label>Этаж</label>
-          <input id="toFloor" type="number" min="0" />
-        </div>
-      </div>
-
-      <label>Фото товара (можно ввести несколько)</label>
-      <input id="photo" type="file" accept="image/*" multiple />
-
-      <label>Номер телефона</label>
-      <input id="phone" type="tel" placeholder="+7 7xx xxx xxxx" />
-
-      <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
-        <button class="btn" id="calcBtn">Рассчитать стоимость</button>
-        <div class="small" id="priceLabel">Цена: —</div>
-      </div>
-
-      <div class="small" style="margin-top:6px">Минимальная цена — 600 ₸. Тариф в этом прототипе: 600 ₸ за 1 км (округляем в большую сторону).</div>
-
-      <div id="map"></div>
-
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-        <button class="btn" id="autoCalcOnMap">Auto: поставить точки A и B и считать</button>
-        <button class="btn" id="sendEmail">Отправить заказ (почта)</button>
-        <a id="waLink" class="btn" href="https://wa.me/77771234567" target="_blank">Связаться в WhatsApp</a>
-      </div>
-
-      <div class="small" style="margin-top:8px">Примечание: если браузер поддерживает Web Share API, фотографии можно отправить через системный почтовый клиент. Иначе будет открыта форма почтового приложения (mailto:) без вложений.</div>
+      <div class="search"><input id="q" type="text" placeholder="Поиск по телефону или адресу" /></div>
+      <div style="margin-top:12px"><button id="refreshBtn" class="btn secondary">Обновить</button> <button id="clearBtn" class="btn" style="margin-left:6px">Удалить всё (тест)</button></div>
+      <div class="small" style="margin-top:10px">Здесь отображаются заказы, которые приходят с клиентского сайта. Для начала разработки используется локальный API-заглушка, позже подключим PHP + MySQL.</div>
     </div>
 
-    <div class="panel">
-      <h2 style="margin-top:0;color:var(--white)">Страница получения заказов — Прототип</h2>
-      <div class="tabs">
-        <div class="tab" data-tab="new">Новые</div>
-        <div class="tab" data-tab="accepted">Принятые</div>
-        <div class="tab" data-tab="inprogress">В процессе</div>
-      </div>
-
-      <div id="ordersList" style="margin-top:10px;max-height:520px;overflow:auto"></div>
-
-      <div class="admin">
-        <button class="btn" id="clearStorage">Очистить тестовые заказы</button>
-        <div class="small" style="margin-top:6px">Этот раздел сохраняет заказы в локальном хранилище браузера — для реальной работы нужен бэкенд с базой данных и API.</div>
-      </div>
+    <div class="main">
+      <h3 id="heading">Заказы</h3>
+      <div id="ordersContainer"></div>
     </div>
   </div>
 
-  <footer>JETEM express — дизайн: белый текст на синем фоне. Мобильная адаптация включена.</footer>
+  <!-- Login overlay (password gate) -->
+  <div id="loginOverlay">
+    <div id="loginCard">
+      <h2>Вход в панель JETEM</h2>
+      <div class="small">Введите пароль, чтобы продолжить</div>
+      <input id="passInput" type="password" placeholder="Пароль" />
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button id="loginBtn" class="btn">Войти</button>
+        <button id="demoBtn" class="btn secondary">Demo (локально)</button>
+      </div>
+      <div id="loginMsg" class="small" style="margin-top:10px;color:#a10b3a;display:none"></div>
+    </div>
+  </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    // Настройки: Центр Конаев (Qonaev/Kapchagay)
-    const KONAEV_CENTER = {lat:43.865, lng:77.053};
-    const SERVICE_RADIUS_M = 20000; // 20 km радиус ограничения зоны — можно скорректировать
-    const RATE_PER_KM = 600; // мы интерпретировали тариф как 600 ₸ за 1 км, округляем вверх
+    // Конфигурация
+    const ADMIN_PASSWORD = '22333';
+    const API_BASE = '/api/orders.php'; // ожидаемый бекенд (PHP)
 
-    // Init map
-    const map = L.map('map').setView([KONAEV_CENTER.lat, KONAEV_CENTER.lng], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19, attribution:'© OpenStreetMap'}).addTo(map);
-
-    // Draw service circle for Konaev
-    L.circle([KONAEV_CENTER.lat,KONAEV_CENTER.lng],{radius:SERVICE_RADIUS_M, color:'#fff', opacity:0.6, fill:false}).addTo(map);
-
-    // Markers A and B
-    let markerA = L.marker([KONAEV_CENTER.lat, KONAEV_CENTER.lng], {draggable:true}).addTo(map).bindPopup('Точка A').openPopup();
-    let markerB = L.marker([KONAEV_CENTER.lat+0.01, KONAEV_CENTER.lng+0.01], {draggable:true}).addTo(map).bindPopup('Точка B');
-
-    function haversineDistance(lat1, lon1, lat2, lon2){
-      const toRad = v=>v*Math.PI/180;
-      const R=6371; // km
-      const dLat=toRad(lat2-lat1); const dLon=toRad(lon2-lon1);
-      const a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)*Math.sin(dLon/2);
-      const c=2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-      return R*c;
-    }
-
-    function inServiceArea(lat,lng){
-      const d = haversineDistance(lat,lng,KONAEV_CENTER.lat,KONAEV_CENTER.lng);
-      return d*1000 <= SERVICE_RADIUS_M;
-    }
-
-    function calculatePrice(){
-      const a = markerA.getLatLng(); const b = markerB.getLatLng();
-      if(!inServiceArea(a.lat,a.lng) || !inServiceArea(b.lat,b.lng)){
-        document.getElementById('priceLabel').textContent = 'Заказ за пределами зоны обслуживания';
-        return null;
-      }
-      const km = haversineDistance(a.lat,a.lng,b.lat,b.lng);
-      const kmRounded = Math.ceil(km); // округляем вверх
-      const price = Math.max(RATE_PER_KM, kmRounded * RATE_PER_KM);
-      document.getElementById('priceLabel').textContent = `Расстояние: ${km.toFixed(2)} км — Цена: ${price} ₸`;
-      return {km, price};
-    }
-
-    document.getElementById('calcBtn').addEventListener('click', calculatePrice);
-
-    // Auto: ставит маркеры A и B на текущ центре и немного смещает — имитирует быстрый выбор точек на карте
-    document.getElementById('autoCalcOnMap').addEventListener('click', ()=>{
-      const center = map.getCenter();
-      markerA.setLatLng(center);
-      markerB.setLatLng([center.lat + 0.01, center.lng + 0.01]);
-      map.fitBounds(L.latLngBounds([markerA.getLatLng(), markerB.getLatLng()]).pad(0.5));
-      calculatePrice();
+    // Простая авторизация: проверяем пароль и сохраняем флаг в sessionStorage
+    const overlay = document.getElementById('loginOverlay');
+    const loginMsg = document.getElementById('loginMsg');
+    document.getElementById('loginBtn').addEventListener('click', ()=>{
+      const v = document.getElementById('passInput').value.trim();
+      if(v===ADMIN_PASSWORD){sessionStorage.setItem('jetem_admin_auth','1'); overlay.style.display='none'; loadOrders();}
+      else{loginMsg.style.display='block'; loginMsg.textContent='Неверный пароль';}
     });
+    document.getElementById('demoBtn').addEventListener('click', ()=>{sessionStorage.setItem('jetem_admin_auth','1'); overlay.style.display='none'; loadOrders(true)});
 
-    // Email / Share
-    document.getElementById('sendEmail').addEventListener('click', async ()=>{
-      const from = document.getElementById('fromAddress').value;
-      const to = document.getElementById('toAddress').value;
-      const phone = document.getElementById('phone').value;
-      const houseA = document.getElementById('fromHouse').value;
-      const aptA = document.getElementById('fromApt').value;
-      const floorA = document.getElementById('fromFloor').value;
-      const houseB = document.getElementById('toHouse').value;
-      const aptB = document.getElementById('toApt').value;
-      const floorB = document.getElementById('toFloor').value;
+    if(sessionStorage.getItem('jetem_admin_auth')==='1'){overlay.style.display='none'; loadOrders();}
 
-      const priceInfo = calculatePrice();
-      if(!priceInfo){alert('Невозможно отправить: точки вне зоны или не рассчитана цена.');return}
+    // UI handling
+    let orders = [];
+    let currentFilter = 'all';
 
-      const body = `Заказ JETEM express%0D%0AОт: ${from} (дом ${houseA}, кв ${aptA}, эт ${floorA})%0D%0AДо: ${to} (дом ${houseB}, кв ${aptB}, эт ${floorB})%0D%0AТелефон: ${phone}%0D%0AРасстояние: ${priceInfo.km.toFixed(2)} км%0D%0AЦена: ${priceInfo.price} ₸`;
-      const subject = encodeURIComponent('Новый заказ JETEM express');
+    document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click', (e)=>{ currentFilter = e.target.dataset.filter; renderOrders(); }));
+    document.getElementById('refreshBtn').addEventListener('click', ()=>loadOrders());
+    document.getElementById('clearBtn').addEventListener('click', ()=>{ if(confirm('Удалить все заказы из localStorage?')){localStorage.removeItem('jetem_admin_orders'); loadOrders(true)} });
+    document.getElementById('q').addEventListener('input', renderOrders);
 
-      const files = document.getElementById('photo').files;
-      // Use Web Share API when available to share files (works on many mobile browsers)
-      if(navigator.canShare && files.length>0){
+    // Загрузить заказы: сначала пробуем API, если не доступен — используем localStorage (mock)
+    async function loadOrders(forceLocal=false){
+      if(!forceLocal){
         try{
-          const fileList = Array.from(files);
-          await navigator.share({title:'Новый заказ JETEM express',text:decodeURIComponent(body.replace(/%0D%0A/g,'\n')),files:fileList});
-          saveOrderLocal({from,to,houseA,aptA,floorA,houseB,aptB,floorB,phone,km:priceInfo.km,price:priceInfo.price,status:'new',time:Date.now()});
-          alert('Заказ отправлен через системный шаринг.');
-          return;
-        }catch(e){console.warn('Share failed',e)}
+          const res = await fetch(API_BASE + '?action=list');
+          if(res.ok){
+            const data = await res.json(); if(data && Array.isArray(data)) { orders = data; renderOrders(); return; }
+          }
+        }catch(e){console.warn('API недоступен, используем локальные данные', e)}
       }
-
-      // Fallback: mailto (attachments невозможны через mailto)
-      const mailto = `mailto:?subject=${subject}&body=${body}`;
-      window.location.href = mailto;
-      saveOrderLocal({from,to,houseA,aptA,floorA,houseB,aptB,floorB,phone,km:priceInfo.km,price:priceInfo.price,status:'new',time:Date.now()});
-    });
-
-    // Orders management (localStorage prototype)
-    function saveOrderLocal(order){
-      const arr = JSON.parse(localStorage.getItem('jetem_orders')||'[]');
-      arr.unshift(order);
-      localStorage.setItem('jetem_orders', JSON.stringify(arr));
+      // fallback: localStorage
+      orders = JSON.parse(localStorage.getItem('jetem_admin_orders')||'[]');
+      // если пусто, добавим демо
+      if(orders.length===0){
+        const now = Date.now();
+        orders = [
+          {id: now+1, from_address:'ул. Демонстрационная 1', from_house:'12', from_apt:'5', from_floor:2, to_address:'ул. Получатель 2', to_house:'3', to_apt:'12', to_floor:1, phone:'+7 701 000 0000', photo_paths:[], distance_km:3.2, price_tenge:Math.ceil(3.2)*600, status:'new', created_at:new Date().toISOString()},
+          {id: now+2, from_address:'ул. Пример A', from_house:'4', from_apt:'2', from_floor:1, to_address:'ул. Пример B', to_house:'9', to_apt:'7', to_floor:1, phone:'+7 700 111 2222', photo_paths:[], distance_km:1.1, price_tenge:600, status:'accepted', created_at:new Date().toISOString()}
+        ];
+        localStorage.setItem('jetem_admin_orders', JSON.stringify(orders));
+      }
       renderOrders();
     }
 
-    function loadOrders(){
-      return JSON.parse(localStorage.getItem('jetem_orders')||'[]');
-    }
-
-    function renderOrders(tab='new'){
-      const container = document.getElementById('ordersList'); container.innerHTML='';
-      const orders = loadOrders();
-      const filtered = orders.filter(o=>{ if(tab==='new') return o.status==='new'; if(tab==='accepted') return o.status==='accepted'; return o.status==='inprogress'; });
-      if(filtered.length===0){container.innerHTML='<div class="small">Пусто</div>';return}
-      filtered.forEach((o,i)=>{
+    function renderOrders(){
+      const cont = document.getElementById('ordersContainer'); cont.innerHTML='';
+      const q = document.getElementById('q').value.trim().toLowerCase();
+      const filtered = orders.filter(o=>{
+        if(currentFilter!=='all' && o.status!==currentFilter) return false;
+        if(q==='') return true;
+        return (o.phone||'').toLowerCase().includes(q) || (o.from_address||'').toLowerCase().includes(q) || (o.to_address||'').toLowerCase().includes(q);
+      });
+      if(filtered.length===0){ cont.innerHTML='<div class="small">Нет заказов</div>'; return }
+      filtered.forEach(o=>{
         const el = document.createElement('div'); el.className='order';
-        el.innerHTML = `<div><strong>Тел:</strong> ${o.phone} — <strong>Цена:</strong> ${Math.round(o.price)} ₸</div><div class="small">От: ${o.from} → До: ${o.to}</div>`;
-        const actions = document.createElement('div'); actions.className='actions';
-        const accept = document.createElement('button'); accept.className='btn'; accept.textContent='Принять'; accept.onclick=()=>{updateOrderStatus(o,'accepted')};
-        const start = document.createElement('button'); start.className='btn'; start.textContent='Взять в работу'; start.onclick=()=>{updateOrderStatus(o,'inprogress')};
-        const cancel = document.createElement('button'); cancel.className='btn'; cancel.textContent='Отменить'; cancel.onclick=()=>{removeOrder(o)};
-        actions.appendChild(accept); actions.appendChild(start); actions.appendChild(cancel);
-        el.appendChild(actions);
-        container.appendChild(el);
-      })
+        const left = document.createElement('div'); left.className='left';
+        left.innerHTML = `<div><strong>${o.phone||'—'}</strong> — ${o.price_tenge || '—'} ₸</div><div class="small">${o.from_address} → ${o.to_address}</div>`;
+        const right = document.createElement('div'); right.className='right';
+        const s = document.createElement('div'); s.className='status ' + statusClass(o.status); s.textContent = statusLabel(o.status);
+        const more = document.createElement('button'); more.className='btn secondary'; more.textContent='Детали'; more.onclick=()=>showDetails(o);
+        const actions = document.createElement('div'); actions.style.display='flex'; actions.style.gap='6px';
+        const accept = document.createElement('button'); accept.className='btn'; accept.textContent='Принять'; accept.onclick=()=>updateStatus(o,'accepted');
+        const take = document.createElement('button'); take.className='btn'; take.textContent='В путь'; take.onclick=()=>updateStatus(o,'inprogress');
+        const complete = document.createElement('button'); complete.className='btn'; complete.textContent='Завершить'; complete.onclick=()=>updateStatus(o,'completed');
+        const cancel = document.createElement('button'); cancel.className='btn secondary'; cancel.textContent='Отменить'; cancel.onclick=()=>updateStatus(o,'cancelled');
+        actions.appendChild(accept); actions.appendChild(take); actions.appendChild(complete); actions.appendChild(cancel);
+        right.appendChild(s); right.appendChild(more); right.appendChild(actions);
+        el.appendChild(left); el.appendChild(right);
+        cont.appendChild(el);
+      });
     }
 
-    function updateOrderStatus(order,newStatus){
-      const arr = loadOrders();
-      const idx = arr.findIndex(o=>o.time===order.time);
-      if(idx!==-1){arr[idx].status=newStatus; localStorage.setItem('jetem_orders',JSON.stringify(arr)); renderOrders(currentTab);}    
-    }
-    function removeOrder(order){
-      let arr = loadOrders(); arr = arr.filter(o=>o.time!==order.time); localStorage.setItem('jetem_orders',JSON.stringify(arr)); renderOrders(currentTab);
-    }
+    function statusClass(st){ if(st==='new') return 's-new'; if(st==='accepted') return 's-accepted'; if(st==='inprogress') return 's-inprogress'; if(st==='completed') return 's-completed'; if(st==='cancelled') return 's-cancelled'; return '' }
+    function statusLabel(st){ if(st==='new') return 'Новый'; if(st==='accepted') return 'Принят'; if(st==='inprogress') return 'В пути'; if(st==='completed') return 'Доставлен'; if(st==='cancelled') return 'Отменён'; return st }
 
-    document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click', (e)=>{currentTab = e.target.dataset.tab; renderOrders(currentTab)}));
-    document.getElementById('clearStorage').addEventListener('click', ()=>{localStorage.removeItem('jetem_orders'); renderOrders(currentTab)});
-
-    let currentTab='new'; renderOrders(currentTab);
-
-    // Add some quick test orders (for demo) if none exist
-    if(loadOrders().length===0){
-      saveOrderLocal({from:'ул. Пример 1',to:'ул. Пример 2',phone:'+7 7xx',houseA:'1',aptA:'2',floorA:'1',houseB:'3',aptB:'4',floorB:'2',km:3.2,price:Math.ceil(3.2)*RATE_PER_KM,status:'new',time:Date.now()});
+    function showDetails(o){
+      const w = window.open('', '_blank');
+      const html = `<!doctype html><html><head><meta charset="utf-8"><title>Заказ ${o.id}</title><style>body{font-family:Arial;padding:12px} .photo{max-width:320px}</style></head><body><h2>Заказ ${o.id}</h2><div><strong>Тел:</strong> ${o.phone||'—'}</div><div><strong>Цена:</strong> ${o.price_tenge||'—'} ₸</div><h3>От</h3><div>${o.from_address} (дом ${o.from_house||''}, кв ${o.from_apt||''}, эт ${o.from_floor||''})</div><h3>До</h3><div>${o.to_address} (дом ${o.to_house||''}, кв ${o.to_apt||''}, эт ${o.to_floor||''})</div><h3>Фото</h3>${(o.photo_paths && o.photo_paths.length>0)? o.photo_paths.map(p=>`<img class="photo" src="${p}"/>`).join('') : '<div>Фото не приложено</div>'}<h3>Действия</h3><div><button onclick="window.opener.postMessage({cmd:'update',id:${o.id},status:'accepted'},'*')">Принять</button> <button onclick="window.opener.postMessage({cmd:'update',id:${o.id},status:'inprogress'},'*')">В путь</button> <button onclick="window.opener.postMessage({cmd:'update',id:${o.id},status:'completed'},'*')">Завершить</button> <button onclick="window.opener.postMessage({cmd:'update',id:${o.id},status:'cancelled'},'*')">Отменить</button></div></body></html>`;
+      w.document.write(html); w.document.close();
     }
 
-    // Update markers from map interactions
-    markerA.on('dragend', calculatePrice);
-    markerB.on('dragend', calculatePrice);
+    // Handle postMessage from details window
+    window.addEventListener('message', (ev)=>{
+      const d = ev.data; if(d && d.cmd==='update'){
+        const order = orders.find(o=>o.id===d.id); if(order) updateStatus(order,d.status);
+      }
+    });
 
-    // Expose small debug
-    window._jetem = {calculatePrice,saveOrderLocal,loadOrders};
+    async function updateStatus(order,newStatus){
+      // Try to call API to update
+      try{
+        const res = await fetch(API_BASE, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'update',id:order.id,status:newStatus})});
+        if(res.ok){ const resp = await res.json(); if(resp.success){ order.status=newStatus; persistLocal(); renderOrders(); return } }
+      }catch(e){console.warn('API update failed, fallback to local', e)}
+      // fallback to local: update in localStorage
+      order.status = newStatus; persistLocal(); renderOrders();
+    }
+
+    function persistLocal(){ localStorage.setItem('jetem_admin_orders', JSON.stringify(orders)); }
+
+    // Listen for incoming client orders via simple polling (for demo) — real implementation: API push or websocket
+    setInterval(async ()=>{
+      try{
+        const res = await fetch(API_BASE + '?action=newcount'); if(res.ok){ const j = await res.json(); if(j && j.newOrders){ /* можно подсветить UI */ } }
+      }catch(e){}
+    }, 15000);
+
   </script>
 </body>
 </html>
