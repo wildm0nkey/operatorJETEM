@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>JETEM express — Заказ доставки</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="" crossorigin=""/>
+  <style>
+    :root{--blue:#0b69d6;--white:#ffffff}
+    body{margin:0;font-family:Inter, Arial, sans-serif;background:var(--blue);color:var(--white);min-height:100vh;display:flex;flex-direction:column}
+    header{padding:18px 16px;text-align:center}
+    h1{margin:0;font-size:20px}
+    .container{display:flex;gap:16px;padding:12px;flex:1}
+    /* Left: customer form */
+    .panel{background:rgba(255,255,255,0.06);border-radius:12px;padding:12px;flex:1;min-width:300px}
+    label{display:block;font-size:13px;margin-top:8px}
+    input[type=text], input[type=tel], input[type=number], textarea{width:100%;padding:8px;border-radius:6px;border:0;background:rgba(255,255,255,0.08);color:var(--white)}
+    .row{display:flex;gap:8px}
+    .btn{display:inline-block;padding:10px 14px;border-radius:8px;border:0;background:var(--white);color:var(--blue);font-weight:600;cursor:pointer;margin-top:10px}
+    #map{height:420px;border-radius:8px;margin-top:10px}
+    .small{font-size:13px;color:rgba(255,255,255,0.85)}
+    .admin{background:rgba(0,0,0,0.15);padding:10px;border-radius:10px;margin-top:12px}
+    .tabs{display:flex;gap:6px}
+    .tab{padding:8px 10px;border-radius:8px;background:rgba(255,255,255,0.06);cursor:pointer}
+    .order{background:rgba(255,255,255,0.04);padding:8px;border-radius:8px;margin-top:8px}
+    .actions{display:flex;gap:8px;margin-top:8px}
+    footer{padding:10px;text-align:center;font-size:13px;color:rgba(255,255,255,0.9)}
+    @media(max-width:900px){.container{flex-direction:column}.panel{min-width:unset}}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>JETEM express</h1>
+    <div class="small">Работаем с 10:00 до 22:00 — зона: город Конаев (
+        )</div>
+  </header>
+
+  <div class="container">
+    <div class="panel" id="customerPanel">
+      <h2 style="margin-top:0;color:var(--white)">Оформление заказа</h2>
+
+      <label>Точка A (адрес)</label>
+      <input id="fromAddress" type="text" placeholder="Улица, ориентир" />
+
+      <div class="row">
+        <div style="flex:2">
+          <label>Номер дома</label>
+          <input id="fromHouse" type="text" />
+        </div>
+        <div style="flex:2">
+          <label>Номер квартиры</label>
+          <input id="fromApt" type="text" />
+        </div>
+        <div style="flex:1">
+          <label>Этаж</label>
+          <input id="fromFloor" type="number" min="0" />
+        </div>
+      </div>
+
+      <label>Точка B (адрес)</label>
+      <input id="toAddress" type="text" placeholder="Улица, ориентир" />
+
+      <div class="row">
+        <div style="flex:2">
+          <label>Номер дома</label>
+          <input id="toHouse" type="text" />
+        </div>
+        <div style="flex:2">
+          <label>Номер квартиры</label>
+          <input id="toApt" type="text" />
+        </div>
+        <div style="flex:1">
+          <label>Этаж</label>
+          <input id="toFloor" type="number" min="0" />
+        </div>
+      </div>
+
+      <label>Фото товара (можно ввести несколько)</label>
+      <input id="photo" type="file" accept="image/*" multiple />
+
+      <label>Номер телефона</label>
+      <input id="phone" type="tel" placeholder="+7 7xx xxx xxxx" />
+
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+        <button class="btn" id="calcBtn">Рассчитать стоимость</button>
+        <div class="small" id="priceLabel">Цена: —</div>
+      </div>
+
+      <div class="small" style="margin-top:6px">Минимальная цена — 600 ₸. Тариф в этом прототипе: 600 ₸ за 1 км (округляем в большую сторону).</div>
+
+      <div id="map"></div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        <button class="btn" id="autoCalcOnMap">Auto: поставить точки A и B и считать</button>
+        <button class="btn" id="sendEmail">Отправить заказ (почта)</button>
+        <a id="waLink" class="btn" href="https://wa.me/77771234567" target="_blank">Связаться в WhatsApp</a>
+      </div>
+
+      <div class="small" style="margin-top:8px">Примечание: если браузер поддерживает Web Share API, фотографии можно отправить через системный почтовый клиент. Иначе будет открыта форма почтового приложения (mailto:) без вложений.</div>
+    </div>
+
+    <div class="panel">
+      <h2 style="margin-top:0;color:var(--white)">Страница получения заказов — Прототип</h2>
+      <div class="tabs">
+        <div class="tab" data-tab="new">Новые</div>
+        <div class="tab" data-tab="accepted">Принятые</div>
+        <div class="tab" data-tab="inprogress">В процессе</div>
+      </div>
+
+      <div id="ordersList" style="margin-top:10px;max-height:520px;overflow:auto"></div>
+
+      <div class="admin">
+        <button class="btn" id="clearStorage">Очистить тестовые заказы</button>
+        <div class="small" style="margin-top:6px">Этот раздел сохраняет заказы в локальном хранилище браузера — для реальной работы нужен бэкенд с базой данных и API.</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>JETEM express — дизайн: белый текст на синем фоне. Мобильная адаптация включена.</footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // Настройки: Центр Конаев (Qonaev/Kapchagay)
+    const KONAEV_CENTER = {lat:43.865, lng:77.053};
+    const SERVICE_RADIUS_M = 20000; // 20 km радиус ограничения зоны — можно скорректировать
+    const RATE_PER_KM = 600; // мы интерпретировали тариф как 600 ₸ за 1 км, округляем вверх
+
+    // Init map
+    const map = L.map('map').setView([KONAEV_CENTER.lat, KONAEV_CENTER.lng], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19, attribution:'© OpenStreetMap'}).addTo(map);
+
+    // Draw service circle for Konaev
+    L.circle([KONAEV_CENTER.lat,KONAEV_CENTER.lng],{radius:SERVICE_RADIUS_M, color:'#fff', opacity:0.6, fill:false}).addTo(map);
+
+    // Markers A and B
+    let markerA = L.marker([KONAEV_CENTER.lat, KONAEV_CENTER.lng], {draggable:true}).addTo(map).bindPopup('Точка A').openPopup();
+    let markerB = L.marker([KONAEV_CENTER.lat+0.01, KONAEV_CENTER.lng+0.01], {draggable:true}).addTo(map).bindPopup('Точка B');
+
+    function haversineDistance(lat1, lon1, lat2, lon2){
+      const toRad = v=>v*Math.PI/180;
+      const R=6371; // km
+      const dLat=toRad(lat2-lat1); const dLon=toRad(lon2-lon1);
+      const a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)*Math.sin(dLon/2);
+      const c=2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+      return R*c;
+    }
+
+    function inServiceArea(lat,lng){
+      const d = haversineDistance(lat,lng,KONAEV_CENTER.lat,KONAEV_CENTER.lng);
+      return d*1000 <= SERVICE_RADIUS_M;
+    }
+
+    function calculatePrice(){
+      const a = markerA.getLatLng(); const b = markerB.getLatLng();
+      if(!inServiceArea(a.lat,a.lng) || !inServiceArea(b.lat,b.lng)){
+        document.getElementById('priceLabel').textContent = 'Заказ за пределами зоны обслуживания';
+        return null;
+      }
+      const km = haversineDistance(a.lat,a.lng,b.lat,b.lng);
+      const kmRounded = Math.ceil(km); // округляем вверх
+      const price = Math.max(RATE_PER_KM, kmRounded * RATE_PER_KM);
+      document.getElementById('priceLabel').textContent = `Расстояние: ${km.toFixed(2)} км — Цена: ${price} ₸`;
+      return {km, price};
+    }
+
+    document.getElementById('calcBtn').addEventListener('click', calculatePrice);
+
+    // Auto: ставит маркеры A и B на текущ центре и немного смещает — имитирует быстрый выбор точек на карте
+    document.getElementById('autoCalcOnMap').addEventListener('click', ()=>{
+      const center = map.getCenter();
+      markerA.setLatLng(center);
+      markerB.setLatLng([center.lat + 0.01, center.lng + 0.01]);
+      map.fitBounds(L.latLngBounds([markerA.getLatLng(), markerB.getLatLng()]).pad(0.5));
+      calculatePrice();
+    });
+
+    // Email / Share
+    document.getElementById('sendEmail').addEventListener('click', async ()=>{
+      const from = document.getElementById('fromAddress').value;
+      const to = document.getElementById('toAddress').value;
+      const phone = document.getElementById('phone').value;
+      const houseA = document.getElementById('fromHouse').value;
+      const aptA = document.getElementById('fromApt').value;
+      const floorA = document.getElementById('fromFloor').value;
+      const houseB = document.getElementById('toHouse').value;
+      const aptB = document.getElementById('toApt').value;
+      const floorB = document.getElementById('toFloor').value;
+
+      const priceInfo = calculatePrice();
+      if(!priceInfo){alert('Невозможно отправить: точки вне зоны или не рассчитана цена.');return}
+
+      const body = `Заказ JETEM express%0D%0AОт: ${from} (дом ${houseA}, кв ${aptA}, эт ${floorA})%0D%0AДо: ${to} (дом ${houseB}, кв ${aptB}, эт ${floorB})%0D%0AТелефон: ${phone}%0D%0AРасстояние: ${priceInfo.km.toFixed(2)} км%0D%0AЦена: ${priceInfo.price} ₸`;
+      const subject = encodeURIComponent('Новый заказ JETEM express');
+
+      const files = document.getElementById('photo').files;
+      // Use Web Share API when available to share files (works on many mobile browsers)
+      if(navigator.canShare && files.length>0){
+        try{
+          const fileList = Array.from(files);
+          await navigator.share({title:'Новый заказ JETEM express',text:decodeURIComponent(body.replace(/%0D%0A/g,'\n')),files:fileList});
+          saveOrderLocal({from,to,houseA,aptA,floorA,houseB,aptB,floorB,phone,km:priceInfo.km,price:priceInfo.price,status:'new',time:Date.now()});
+          alert('Заказ отправлен через системный шаринг.');
+          return;
+        }catch(e){console.warn('Share failed',e)}
+      }
+
+      // Fallback: mailto (attachments невозможны через mailto)
+      const mailto = `mailto:?subject=${subject}&body=${body}`;
+      window.location.href = mailto;
+      saveOrderLocal({from,to,houseA,aptA,floorA,houseB,aptB,floorB,phone,km:priceInfo.km,price:priceInfo.price,status:'new',time:Date.now()});
+    });
+
+    // Orders management (localStorage prototype)
+    function saveOrderLocal(order){
+      const arr = JSON.parse(localStorage.getItem('jetem_orders')||'[]');
+      arr.unshift(order);
+      localStorage.setItem('jetem_orders', JSON.stringify(arr));
+      renderOrders();
+    }
+
+    function loadOrders(){
+      return JSON.parse(localStorage.getItem('jetem_orders')||'[]');
+    }
+
+    function renderOrders(tab='new'){
+      const container = document.getElementById('ordersList'); container.innerHTML='';
+      const orders = loadOrders();
+      const filtered = orders.filter(o=>{ if(tab==='new') return o.status==='new'; if(tab==='accepted') return o.status==='accepted'; return o.status==='inprogress'; });
+      if(filtered.length===0){container.innerHTML='<div class="small">Пусто</div>';return}
+      filtered.forEach((o,i)=>{
+        const el = document.createElement('div'); el.className='order';
+        el.innerHTML = `<div><strong>Тел:</strong> ${o.phone} — <strong>Цена:</strong> ${Math.round(o.price)} ₸</div><div class="small">От: ${o.from} → До: ${o.to}</div>`;
+        const actions = document.createElement('div'); actions.className='actions';
+        const accept = document.createElement('button'); accept.className='btn'; accept.textContent='Принять'; accept.onclick=()=>{updateOrderStatus(o,'accepted')};
+        const start = document.createElement('button'); start.className='btn'; start.textContent='Взять в работу'; start.onclick=()=>{updateOrderStatus(o,'inprogress')};
+        const cancel = document.createElement('button'); cancel.className='btn'; cancel.textContent='Отменить'; cancel.onclick=()=>{removeOrder(o)};
+        actions.appendChild(accept); actions.appendChild(start); actions.appendChild(cancel);
+        el.appendChild(actions);
+        container.appendChild(el);
+      })
+    }
+
+    function updateOrderStatus(order,newStatus){
+      const arr = loadOrders();
+      const idx = arr.findIndex(o=>o.time===order.time);
+      if(idx!==-1){arr[idx].status=newStatus; localStorage.setItem('jetem_orders',JSON.stringify(arr)); renderOrders(currentTab);}    
+    }
+    function removeOrder(order){
+      let arr = loadOrders(); arr = arr.filter(o=>o.time!==order.time); localStorage.setItem('jetem_orders',JSON.stringify(arr)); renderOrders(currentTab);
+    }
+
+    document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click', (e)=>{currentTab = e.target.dataset.tab; renderOrders(currentTab)}));
+    document.getElementById('clearStorage').addEventListener('click', ()=>{localStorage.removeItem('jetem_orders'); renderOrders(currentTab)});
+
+    let currentTab='new'; renderOrders(currentTab);
+
+    // Add some quick test orders (for demo) if none exist
+    if(loadOrders().length===0){
+      saveOrderLocal({from:'ул. Пример 1',to:'ул. Пример 2',phone:'+7 7xx',houseA:'1',aptA:'2',floorA:'1',houseB:'3',aptB:'4',floorB:'2',km:3.2,price:Math.ceil(3.2)*RATE_PER_KM,status:'new',time:Date.now()});
+    }
+
+    // Update markers from map interactions
+    markerA.on('dragend', calculatePrice);
+    markerB.on('dragend', calculatePrice);
+
+    // Expose small debug
+    window._jetem = {calculatePrice,saveOrderLocal,loadOrders};
+  </script>
+</body>
+</html>
